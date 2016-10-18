@@ -67,11 +67,12 @@ def upload(config):
 
 
 def ftpupload(session, path):
-    # # connect database
-    # connect = sqlite3.connect('list.sqlite')
-    # connect.text_factory = str
-    # cur = connect.cursor()
-    # create topdir
+    """Upload file.
+
+    Args:
+        session:ftp session.
+        path:upload path.
+    """
     topdir = os.path.split(path)[1]
     try:
         session.mkd(topdir)
