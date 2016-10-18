@@ -4,9 +4,7 @@
 import ftplib
 import log
 import os
-import fileinput
 import time
-import sqlite3
 from collections import namedtuple
 
 
@@ -69,10 +67,10 @@ def upload(config):
 
 
 def ftpupload(session, path):
-    # connect database
-    connect = sqlite3.connect('list.sqlite')
-    connect.text_factory = str
-    cur = connect.cursor()
+    # # connect database
+    # connect = sqlite3.connect('list.sqlite')
+    # connect.text_factory = str
+    # cur = connect.cursor()
     # create topdir
     topdir = os.path.split(path)[1]
     try:
@@ -80,16 +78,10 @@ def ftpupload(session, path):
     except:
         pass
     session.cwd(topdir)
-    cur.execute('CREATE TABLE IF NOT EXISTS ' + topdir +
-                ' (id INTERGER PRIMARY KEY, name TEXT, error INTEGER)')
     for subpath in os.listdir(path):
         localpath = os.path.join(path, subpath)
         if os.path.isfile(localpath):
-            cur.execute('SELECT id FROM ' + topdir + ' WHERE name=?',
-                        (subpath, ))
-            if cur.fetchone():
-                message = log.Message('Skip %s' % localpath, log.Level.INFO)
-                message.log()
+            if subpath in session.nlst():
                 continue
             try:
                 with open(localpath, 'rb') as f:
@@ -97,21 +89,13 @@ def ftpupload(session, path):
                 message = log.Message('Upload %s successful!' % localpath,
                                       log.Level.INFO)
                 message.log()
-                cur.execute('INSERT INTO ' + topdir + ' (name) VALUES (?)',
-                            (subpath, ))
             except:
                 message = log.Message('Upload %s failed!' % localpath,
                                       log.Level.WARNING)
                 message.log()
-                cur.execute(
-                    'INSERT INTO ' + topdir + ' (name, error) VALUES (?, ?)',
-                    (subpath, 1))
         elif os.path.isdir(localpath):
             ftpupload(session, localpath)
             session.cwd('..')
-    connect.commit()
-    cur.close()
-    connect.close()
 
 
 def configure():
