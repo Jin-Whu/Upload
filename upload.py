@@ -6,7 +6,6 @@ import log
 import os
 import time
 import datetime
-import multiprocessing
 from collections import namedtuple
 
 
@@ -66,10 +65,10 @@ def upload(config):
                               log.Level.INFO)
         message.log()
         for path in config.path:
-            process = multiprocessing.Process(
-                target=ftpupload, args=(session, path, upload_date))
-            process.start()
-            process.join()
+            try:
+                ftpupload(session, path, upload_date)
+            except:
+                pass
         session.quit()
         message = log.Message('Upload done!', log.Level.INFO)
         message.log()
