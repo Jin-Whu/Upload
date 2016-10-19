@@ -16,11 +16,14 @@ class Config(object):
         interlval:interval to upload, in seconds, type:int.
         path:file path to upload, type:list.
         ftp:ftp, type:namedtuple.
+        filter:file filter.
     """
 
-    def __init__(self, interval, path, ftp):
+    def __init__(self, interval, path, prefix, suffix, ftp):
         self.interval = interval
         self.path = path
+        self.prefix = prefix
+        self.suffix = suffix
         self.ftp = ftp
 
     def check(self):
@@ -48,6 +51,10 @@ class Config(object):
             message = log.Message('Missing ftp information', log.Level.ERROR)
             message.log()
             return 0
+
+        filefilter = namedtuple('Filter', ('prefix', 'suffix'))
+        self.filter = filefilter(self.prefix, self.suffix)
+
         return 1
 
 
@@ -64,9 +71,11 @@ def upload(config):
         message = log.Message('Strat upload %s\'s file' % str(upload_date),
                               log.Level.INFO)
         message.log()
+        # file filter
+        filefilter = config.filter
         for path in config.path:
             try:
-                ftpupload(session, path, upload_date)
+                ftpupload(session, path, upload_date, filefilter)
             except:
                 pass
         session.quit()
@@ -75,14 +84,16 @@ def upload(config):
         time.sleep(config.interval)
 
 
-def ftpupload(session, path, upload_date):
+def ftpupload(session, path, upload_date, filefilter):
     """Upload file.
 
     Args:
         session:ftp session.
         path:upload path.
         upload_date:upload file date.
+        filefilter:file filter.
     """
+    uploadflag = True
     topdir = os.path.split(path)[1]
     try:
         session.mkd(topdir)
@@ -98,6 +109,22 @@ def ftpupload(session, path, upload_date):
                 os.path.getmtime(localpath)).date()
             if timestamp != upload_date:
                 continue
+            if filefilter.prefix:
+                for prefix in filefilter.prefix:
+                    if not subpath.startswith(prefix):
+                        uploadflag = False
+                    else:
+                        uploadflag = True
+                        break
+            if not uploadflag and filefilter.suffix:
+                for suffix in filefilter.suffix:
+                    if not subpath.endswith(suffix):
+                        uploadflag = False
+                    else:
+                        uploadflag = True
+                        break
+            if not uploadflag:
+                continue
             try:
                 with open(localpath, 'rb') as f:
                     session.storbinary('STOR %s' % subpath, f, 1024)
@@ -109,7 +136,7 @@ def ftpupload(session, path, upload_date):
                                       log.Level.WARNING)
                 message.log()
         elif os.path.isdir(localpath):
-            ftpupload(session, localpath, upload_date)
+            ftpupload(session, localpath, upload_date, filefilter)
             session.cwd('..')
 
 
@@ -123,6 +150,8 @@ def configure():
 
     interval = None
     path = list()
+    prefix = list()
+    suffix = list()
     ftp = namedtuple('FTP', ('host', 'user', 'password'))
     host = None
     user = None
@@ -133,7 +162,7 @@ def configure():
                 interval = line.split('=')[1].strip()
 
             if line.startswith('path'):
-                path.append(line.split('=')[1].strip())
+                path.extend(line.split('=')[1].split())
 
             if line.startswith('host'):
                 host = line.split('=')[1].strip()
@@ -143,7 +172,14 @@ def configure():
 
             if line.startswith('password'):
                 password = line.split('=')[1].strip()
-    config = Config(interval, path, ftp(host, user, password))
+
+            if line.startswith('prefix'):
+                prefix.extend(line.split('=')[1].split())
+
+            if line.startswith('suffix'):
+                suffix.extend(line.split('=')[1].split())
+
+    config = Config(interval, path, prefix, suffix, ftp(host, user, password))
     if not config.check():
         return 0
     return config
