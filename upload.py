@@ -5,6 +5,7 @@ import ftplib
 import log
 import os
 import time
+import datetime
 from collections import namedtuple
 
 
@@ -58,20 +59,26 @@ def upload(config):
                              passwd=config.ftp.password)
         message = log.Message('Login to %s' % config.ftp.host, log.Level.INFO)
         message.log()
+        upload_date = (datetime.datetime.now() - datetime.timedelta(
+            seconds=config.interval)).date()
+        message = log.Message('Strat upload %s\'s file' % str(upload_date),
+                              log.Level.INFO)
+        message.log()
         for path in config.path:
-            ftpupload(session, path)
+            ftpupload(session, path, upload_date)
         session.quit()
         message = log.Message('Upload done!', log.Level.INFO)
         message.log()
         time.sleep(config.interval)
 
 
-def ftpupload(session, path):
+def ftpupload(session, path, upload_date):
     """Upload file.
 
     Args:
         session:ftp session.
         path:upload path.
+        upload_date:upload file date.
     """
     topdir = os.path.split(path)[1]
     try:
@@ -84,6 +91,10 @@ def ftpupload(session, path):
         if os.path.isfile(localpath):
             if subpath in session.nlst():
                 continue
+            timestamp = datetime.datetime.fromtimestamp(
+                os.path.getmtime(localpath)).date()
+            if timestamp != upload_date:
+                continue
             try:
                 with open(localpath, 'rb') as f:
                     session.storbinary('STOR %s' % subpath, f, 1024)
@@ -95,7 +106,7 @@ def ftpupload(session, path):
                                       log.Level.WARNING)
                 message.log()
         elif os.path.isdir(localpath):
-            ftpupload(session, localpath)
+            ftpupload(session, localpath, upload_date)
             session.cwd('..')
 
 
