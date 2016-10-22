@@ -5,7 +5,6 @@ import ftplib
 import log
 import os
 import time
-import datetime
 from collections import namedtuple
 
 
@@ -66,16 +65,11 @@ def upload(config):
                              passwd=config.ftp.password)
         message = log.Message('Login to %s' % config.ftp.host, log.Level.INFO)
         message.log()
-        upload_date = (datetime.datetime.now() - datetime.timedelta(
-            seconds=config.interval)).date()
-        message = log.Message('Strat upload %s\'s file' % str(upload_date),
-                              log.Level.INFO)
-        message.log()
         # file filter
         filefilter = config.filter
         for path in config.path:
             try:
-                ftpupload(session, path, upload_date, filefilter)
+                ftpupload(session, path, filefilter)
             except:
                 pass
         session.quit()
@@ -84,13 +78,12 @@ def upload(config):
         time.sleep(config.interval)
 
 
-def ftpupload(session, path, upload_date, filefilter):
+def ftpupload(session, path, filefilter):
     """Upload file.
 
     Args:
         session:ftp session.
         path:upload path.
-        upload_date:upload file date.
         filefilter:file filter.
     """
     uploadflag = True
@@ -104,11 +97,8 @@ def ftpupload(session, path, upload_date, filefilter):
         localpath = os.path.join(path, subpath)
         if os.path.isfile(localpath):
             if subpath in session.nlst():
-                continue
-            timestamp = datetime.datetime.fromtimestamp(
-                os.path.getmtime(localpath)).date()
-            if timestamp != upload_date:
-                continue
+                if os.stat(localpath).st_size == session.size(subpath):
+                    continue
             if filefilter.prefix:
                 for prefix in filefilter.prefix:
                     if not subpath.startswith(prefix):
@@ -136,7 +126,7 @@ def ftpupload(session, path, upload_date, filefilter):
                                       log.Level.WARNING)
                 message.log()
         elif os.path.isdir(localpath):
-            ftpupload(session, localpath, upload_date, filefilter)
+            ftpupload(session, localpath, filefilter)
             session.cwd('..')
 
 
