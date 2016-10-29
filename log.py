@@ -31,7 +31,6 @@ class Message(object):
         elif self.level == Level.INFO:
             logging.info(self.message)
         elif self.level == Level.WARNING:
-            print 1
             logging.warning(self.message)
         elif self.level == Level.ERROR:
             logging.error(self.message)
