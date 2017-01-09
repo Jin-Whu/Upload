@@ -72,7 +72,10 @@ def upload(config):
                 ftpupload(session, path, filefilter)
             except:
                 pass
-        session.quit()
+        try:
+            session.quit()
+        except:
+            pass
         message = log.Message('Upload done!', log.Level.INFO)
         message.log()
         time.sleep(config.interval)
