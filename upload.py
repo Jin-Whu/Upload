@@ -5,6 +5,7 @@ import ftplib
 import log
 import os
 import time
+import re
 from collections import namedtuple
 
 
@@ -18,11 +19,13 @@ class Config(object):
         filter:file filter.
     """
 
-    def __init__(self, interval, path, prefix, suffix, ftp):
+    def __init__(self, interval, path, prefix, suffix, rule, regex, ftp):
         self.interval = interval
         self.path = path
         self.prefix = prefix
         self.suffix = suffix
+        self.rule = rule
+        self.regex = regex
         self.ftp = ftp
 
     def check(self):
@@ -51,8 +54,19 @@ class Config(object):
             message.log()
             return 0
 
-        filefilter = namedtuple('Filter', ('prefix', 'suffix'))
-        self.filter = filefilter(self.prefix, self.suffix)
+        if not self.regex:
+            if self.rule not in ['sgl', 'com']:
+                message = log.Message('rule must be sgl or com', log.Level.ERROR)
+                message.log()
+                return 0
+
+        if self.ftp.keep not in ['yes', 'no']:
+            message = log.Message('ftp keep must be yes or no', log.Level.ERROR)
+            Message.log()
+            return 0
+
+        filefilter = namedtuple('Filter', ('prefix', 'suffix', 'rule', 'regex'))
+        self.filter = filefilter(self.prefix, self.suffix, self.rule, self.regex)
 
         return 1
 
@@ -66,10 +80,12 @@ def upload(config):
         message = log.Message('Login to %s' % config.ftp.host, log.Level.INFO)
         message.log()
         # file filter
+        if config.ftp.dir:
+            session.cwd(config.ftp.dir)
         filefilter = config.filter
         for path in config.path:
             try:
-                ftpupload(session, path, filefilter)
+                ftpupload(session, path, config.ftp.keep, filefilter)
             except:
                 pass
         try:
@@ -78,10 +94,12 @@ def upload(config):
             pass
         message = log.Message('Upload done!', log.Level.INFO)
         message.log()
+        if not config.interval:
+            break
         time.sleep(config.interval)
 
 
-def ftpupload(session, path, filefilter):
+def ftpupload(session, path, keep, filefilter):
     """Upload file.
 
     Args:
@@ -90,32 +108,49 @@ def ftpupload(session, path, filefilter):
         filefilter:file filter.
     """
     uploadflag = True
-    topdir = os.path.split(path)[1]
-    try:
-        session.mkd(topdir)
-    except:
-        pass
-    session.cwd(topdir)
+    if keep == 'yes':
+        directory = os.path.split(path)[1]
+        if directory:
+            try:
+                session.mkd(directory)
+                session.cwd(directory)
+            except:
+                pass
     for subpath in os.listdir(path):
         localpath = os.path.join(path, subpath)
         if os.path.isfile(localpath):
             if subpath in session.nlst():
                 if os.stat(localpath).st_size == session.size(subpath):
                     continue
-            if filefilter.prefix:
-                for prefix in filefilter.prefix:
-                    if not subpath.startswith(prefix):
-                        uploadflag = False
-                    else:
+            if not filefilter.regex:
+                if filefilter.rule == 'sgl':
+                    if filefilter.prefix:
+                        for prefix in filefilter.prefix:
+                            if not subpath.startswith(prefix):
+                                uploadflag = False
+                            else:
+                                uploadflag = True
+                                break
+                    if not uploadflag and filefilter.suffix:
+                        for suffix in filefilter.suffix:
+                            if not subpath.endswith(suffix):
+                                uploadflag = False
+                            else:
+                                uploadflag = True
+                                break
+                elif filefilter.rule == 'com':
+                    for prefix, suffix in zip(filefilter.prefix, filefilter.suffix):
+                        if subpath.startswith(prefix) and subpath.endswith(suffix):
+                            uploadflag = True
+                            break
+                        else:
+                            uploadflag = False
+            else:
+                for regex in filefilter.regex:
+                    if re.match(r'%s' % regex, subpath):
                         uploadflag = True
-                        break
-            if not uploadflag and filefilter.suffix:
-                for suffix in filefilter.suffix:
-                    if not subpath.endswith(suffix):
-                        uploadflag = False
                     else:
-                        uploadflag = True
-                        break
+                        uploadflag = False
             if not uploadflag:
                 continue
             try:
@@ -129,8 +164,9 @@ def ftpupload(session, path, filefilter):
                                       log.Level.WARNING)
                 message.log()
         elif os.path.isdir(localpath):
-            ftpupload(session, localpath, filefilter)
-            session.cwd('..')
+            ftpupload(session, localpath, keep, filefilter)
+            if keep == 'yes':
+                session.cwd('..')
 
 
 def configure():
@@ -145,10 +181,14 @@ def configure():
     path = list()
     prefix = list()
     suffix = list()
-    ftp = namedtuple('FTP', ('host', 'user', 'password'))
+    rule = None
+    regex = list()
+    ftp = namedtuple('FTP', ('host', 'user', 'password', 'dir', 'keep'))
     host = None
     user = None
     password = None
+    directory = None
+    keep = None
     with open(config_path) as f:
         for line in f:
             if line.startswith('interval'):
@@ -166,13 +206,26 @@ def configure():
             if line.startswith('password'):
                 password = line.split('=')[1].strip()
 
+            if line.startswith('dir'):
+                directory = line.split('=')[1].strip()
+
+            if line.startswith('keep'):
+                keep = line.split('=')[1].strip()
+
             if line.startswith('prefix'):
                 prefix.extend(line.split('=')[1].split())
 
             if line.startswith('suffix'):
                 suffix.extend(line.split('=')[1].split())
 
-    config = Config(interval, path, prefix, suffix, ftp(host, user, password))
+            if line.startswith('rule'):
+                rule = line.split('=')[1].strip()
+
+            if line.startswith('regex'):
+                regex.extend(line.split('=')[1].split())
+
+
+    config = Config(interval, path, prefix, suffix, rule, regex, ftp(host, user, password, directory, keep))
     if not config.check():
         return 0
     return config
