@@ -157,6 +157,7 @@ def ftpupload(session, path, keep, filefilter):
                 for regex in filefilter.regex:
                     if re.match(r'%s' % regex, subpath):
                         uploadflag = True
+                        break
                     else:
                         uploadflag = False
             if not uploadflag:
