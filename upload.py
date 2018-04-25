@@ -105,6 +105,7 @@ def ftpupload(session, path, keep, filefilter):
     Args:
         session:ftp session.
         path:upload path.
+        keep:keep directory structure.
         filefilter:file filter.
     """
     uploadflag = True
@@ -113,9 +114,9 @@ def ftpupload(session, path, keep, filefilter):
         if directory:
             try:
                 session.mkd(directory)
-                session.cwd(directory)
             except:
                 pass
+            session.cwd(directory)
     for subpath in os.listdir(path):
         localpath = os.path.join(path, subpath)
         if os.path.isfile(localpath):
