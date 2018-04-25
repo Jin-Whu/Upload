@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding:utf-8
 
+import argparse
 import ftplib
 import log
 import os
@@ -81,7 +82,10 @@ def upload(config):
         message.log()
         # file filter
         if config.ftp.dir:
-            session.cwd(config.ftp.dir)
+            try:
+                session.cwd(config.ftp.dir)
+            except:
+                pass
         filefilter = config.filter
         for path in config.path:
             try:
@@ -116,7 +120,10 @@ def ftpupload(session, path, keep, filefilter):
                 session.mkd(directory)
             except:
                 pass
-            session.cwd(directory)
+            try:
+                session.cwd(directory)
+            except:
+                pass
     for subpath in os.listdir(path):
         localpath = os.path.join(path, subpath)
         if os.path.isfile(localpath):
@@ -170,9 +177,8 @@ def ftpupload(session, path, keep, filefilter):
                 session.cwd('..')
 
 
-def configure():
+def configure(config_path):
     """read configure file."""
-    config_path = os.path.join(os.path.dirname(__file__), 'configure.ini')
     if not os.path.exists(config_path):
         message = log.Message('Not find %s' % config_path, log.Level.ERROR)
         message.log()
@@ -232,9 +238,9 @@ def configure():
     return config
 
 
-def main():
+def main(configpath):
     """script main entry."""
-    config = configure()  # read configure file
+    config = configure(configpath)  # read configure file
     if not config:
         return 0
 
@@ -243,4 +249,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser('uploader')
+    parser.add_argument('path', type=str, help='configure path')
+    args = parser.parse_args()
+    main(args.path)
