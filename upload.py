@@ -124,11 +124,12 @@ def ftpupload(session, path, keep, filefilter):
                 session.cwd(directory)
             except:
                 pass
+    ftpfiles = session.nlst()
     for subpath in os.listdir(path):
         localpath = os.path.join(path, subpath)
         if os.path.isfile(localpath):
-            if subpath in session.nlst():
-                if os.stat(localpath).st_size <= session.size(subpath):
+            if subpath in ftpfiles:
+                if os.stat(localpath).st_size == session.size(subpath):
                     continue
             if not filefilter.regex:
                 if filefilter.rule == 'sgl':
