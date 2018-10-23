@@ -75,9 +75,10 @@ class Config(object):
 def upload(config):
     """Upload file."""
     while True:
-        session = ftplib.FTP(host=config.ftp.host,
-                             user=config.ftp.user,
-                             passwd=config.ftp.password)
+        session = ftplib.FTP()
+        ftp_host = config.ftp.host.split(':')
+        session.connect(ftp_host[0], int(ftp_host[1]) if len(ftp_host) > 1 else 21)
+        session.login(config.ftp.user, config.ftp.password)
         message = log.Message('Login to %s' % config.ftp.host, log.Level.INFO)
         message.log()
         # file filter
@@ -129,7 +130,7 @@ def ftpupload(session, path, keep, filefilter):
         localpath = os.path.join(path, subpath)
         if os.path.isfile(localpath):
             if subpath in ftpfiles:
-                if os.stat(localpath).st_size == session.size(subpath):
+                if os.stat(localpath).st_size <= session.size(subpath):
                     continue
             if not filefilter.regex:
                 if filefilter.rule == 'sgl':
