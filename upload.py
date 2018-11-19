@@ -46,9 +46,9 @@ class Config(object):
         for filepath in self.path:
             if not os.path.exists(filepath):
                 message = log.Message('Not find path to upload: %s' % filepath,
-                                      log.Level.ERROR)
+                                      log.Level.WARNING)
                 message.log()
-                return 0
+                # return 0 (enable non-existed path)
 
         if not self.ftp.host or not self.ftp.user or not self.ftp.password:
             message = log.Message('Missing ftp information', log.Level.ERROR)
@@ -113,6 +113,8 @@ def ftpupload(session, path, keep, filefilter):
         keep:keep directory structure.
         filefilter:file filter.
     """
+    if not os.path.isdir(path):
+        return
     uploadflag = True
     if keep == 'yes':
         directory = os.path.split(path)[1]
