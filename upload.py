@@ -194,7 +194,7 @@ def uploadfp(session, path, keep, filefilter):
     """
     if not os.path.isdir(path):
         return
-    uploadflag = True
+    uploadflag = False 
     if keep == 'yes':
         directory = os.path.split(path)[1]
         if directory:
