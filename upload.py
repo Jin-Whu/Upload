@@ -202,9 +202,12 @@ class PatternFile(object):
             '{HH}': '%H',
             '{mm}': '%M',
             '{SS}': '%S',
-            '{DOY}': '%j'
+            '{DOY}': '%j',
+            '*': '.+',
         }
         week, wday = self.__week(self.__t)
+        if '.' in self.__pattern:
+            self.__pattern = self.__pattern.replace('.', '\\.')
         for pattern in formats:
             if pattern in self.__pattern:
                 self.__pattern = self.__pattern.replace(pattern, formats[pattern])
@@ -294,11 +297,11 @@ def uploadfp(session, path, keep, filefilter, delay):
             if filefilter.pattern:
                 for pattern in filefilter.pattern:
                     pfile = PatternFile(pattern, delay)
-                    if subpath == pfile.filename:
+                    if re.match(r'^%s$' % pfile.filename, subpath):
                         uploadflag = True
             elif filefilter.regex:
                 for regex in filefilter.regex:
-                    if re.match(r'^%s+$' % regex, subpath):
+                    if re.match(r'^%s$' % regex, subpath):
                         uploadflag = True
                         break
             else:
